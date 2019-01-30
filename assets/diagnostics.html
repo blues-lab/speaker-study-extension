@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <title>Diagnostics</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link rel="stylesheet" href="./calbrand/bootstrap.min.css" />
+
+        <!-- Prototype styles -->
+        <link rel="stylesheet" href="./calbrand/nav.css" />
+        <link rel="stylesheet" href="./calbrand/layout.css" />
+        <link rel="stylesheet" href="./calbrand/typography.css" />
+        <link rel="stylesheet" href="./calbrand/components.css" />
+
+        <!-- Site Specific CSS -->
+        <link rel="stylesheet" href="./calbrand/site.css" />
+
+        <link rel="stylesheet" href="./calbrand/custom.css" />
+
+        <link rel="stylesheet" href="mocha.css" />
+    </head>
+    <body class="home">
+        <header id="site-header" class="subbrand light">
+            <div class="navbar navbar-default navbar-static-top yamm">
+                <div class="container">
+                    <div class="navbar-header one-line">
+                        <h1>
+                            <a href="index.html">
+                                <span
+                                    class="b-wordmark"
+                                    aria-hidden="true"
+                                ></span
+                                ><span class="dept-title one"
+                                    >Smart Speaker Study</span
+                                >
+                            </a>
+                        </h1>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div id="content" role="main">
+            <div class="container" style="height: 100%; overflow:hidden">
+                <h2>Debug mode</h2>
+                <p>
+                    Turn on debug mode to go through the survey even if you're
+                    not signed in to a Google or Amazon account. <br />
+                    Debug mode is currently
+                    <span id="debug-status" style="font-weight: bold"></span>.
+                </p>
+                <div class="checkbox">
+                    <label style="font-weight: bold">
+                        <input id="debug" type="checkbox" /> Debug mode
+                    </label>
+                </div>
+
+                <hr />
+
+                <h2>Error reporting test</h2>
+                <p>
+                    You only need to perform this test if you were asked to as
+                    part of our support process. The button below sends an error
+                    report, like the one we'd send if the diagnostics failed.
+                    Note: there likely won't be immediate feedback about whether
+                    this test succeeded or failed.
+                </p>
+                <button id="test_error" class="btn btn-primary">
+                    Send test report
+                </button>
+
+                <hr />
+                <h2>Diagnostics</h2>
+                <p>
+                    The purpose of the diagnostics tool is to test the
+                    interaction between our extension and your Amazon or Google
+                    account. We might ask you to run it if something went wrong
+                    during the study or simply to test that everything is
+                    working correctly. In either case, thank you for your help!
+                </p>
+                <p>
+                    Start a diagnostics test by clicking the appropriate button
+                    for your device.
+                </p>
+                <p>
+                    Reminder: you'll need to be logged in to your Amazon/Google
+                    account.
+                </p>
+                <p>
+                    <button id="google" class="btn btn-primary">
+                        Run Google diagnostics
+                    </button>
+                    <button id="amazon" class="btn btn-primary">
+                        Run Amazon diagnostics
+                    </button>
+                </p>
+                <div id="mocha"></div>
+            </div>
+            <!-- .container -->
+        </div>
+        <!-- #content -->
+
+        <footer id="universal-footer">
+            <div class="container">
+                <div class="row">
+                    <div class="col-xs-6 col-sm-4 col-md-3">
+                        <div class="block logo">
+                            <a href="https://www.berkeley.edu/"
+                                ><img
+                                    src="./calbrand/logo-ucberkeley-white.png"
+                                    alt="University of California Berkeley"
+                            /></a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </footer>
+
+        <script src="mocha.js"></script>
+        <script src="../diagnostics.js" type="module"></script>
+    </body>
+</html>
