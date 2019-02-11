@@ -1,13 +1,19 @@
+import { reportIssue } from '../../chrome/common/errors';
 import {
+    DownloadStatus,
+    Interaction,
     ValidationResult,
-    VerificationState,
-    Interaction
+    VerificationState
 } from '../../common/types';
 import { Device } from '../device';
-import { wait } from '../util';
+import { MAX_WAIT_SECONDS } from '../settings';
+import { sleep } from '../util';
 
 type GoogleActivityList = any[];
 type GoogleActivityResponse = [GoogleActivityList | null, string | null];
+interface GoogleValidationResult extends ValidationResult {
+    activities: GoogleActivityList;
+}
 
 /**
  * If we find ourselves making this many requests, something may have gone wrong, and we should probably stop.
@@ -135,16 +141,28 @@ function parseActivityData(jsonString: string): GoogleActivityResponse {
  */
 async function downloadAllActivity(
     csrfToken: string
-): Promise<[GoogleActivityList, Error[]]> {
-    const errors: Error[] = [];
+): Promise<GoogleValidationResult> {
+    let allActivities: GoogleActivityList = [];
+    const allErrors: Error[] = [];
+    let downloadStatus: DownloadStatus = DownloadStatus.success;
+
+    const startTime = performance.now();
 
     let response = await fetchJsonData(csrfToken);
-    let [activities, cursor] = parseActivityData(response);
+    let [currentActivities, cursor] = parseActivityData(response);
 
-    if (activities === null) {
+    if (currentActivities === null) {
         // Initial activity response is empty (null)
         // This means the user has no activity saved.
-        return [[], []];
+        allActivities = [];
+
+        // Cursor should also be null. If it isn't, that's unexpected.
+        if (cursor !== null) {
+            reportIssue("initial activity was null but cursor wasn't");
+            cursor = null;
+        }
+    } else {
+        allActivities = allActivities.concat(currentActivities);
     }
 
     let requests = 1;
@@ -152,33 +170,49 @@ async function downloadAllActivity(
     while (cursor !== null) {
         // Wait a little bit to avoid sending too many requests at once
         const waitTime = 100 * Math.log10(requests);
-        await wait(waitTime);
+        await sleep(waitTime);
 
         // Fetch and parse the next round of data
         try {
             response = await fetchJsonData(csrfToken, cursor);
-            const data = parseActivityData(response);
-            cursor = data[1];
+            [currentActivities, cursor] = parseActivityData(response);
 
-            if (data[0] === null) {
+            if (currentActivities === null) {
                 // We've downloaded all available data. Nothing left.
                 break;
             } else {
                 // Add the new data to the existing one
-                activities = activities.concat(data[0]);
+                allActivities = allActivities.concat(currentActivities);
             }
         } catch (error) {
-            errors.push(error);
+            allErrors.push(error);
             break;
         }
+
         // If we seem to be stuck in a loop, abort
         if (++requests > TOO_MANY_REQUESTS) {
             console.warn('aborting fetching because we sent too many requests');
+            downloadStatus = DownloadStatus.maxedOut;
+            break;
+        }
+
+        // If we've taken too long, abort.
+        const timeNow = performance.now();
+        const secondsElapsed = (timeNow - startTime) / 1000;
+        if (secondsElapsed > MAX_WAIT_SECONDS) {
+            console.warn(`exceeded wait time of ${MAX_WAIT_SECONDS} seconds`);
+            downloadStatus = DownloadStatus.timedOut;
             break;
         }
     }
 
-    return [activities, errors];
+    return {
+        status: VerificationState.loggedIn,
+        downloadStatus,
+        activities: allActivities,
+        interactions: [],
+        errors: allErrors
+    };
 }
 
 /**
@@ -363,18 +397,22 @@ async function validateGoogle(): Promise<ValidationResult> {
     // Get the CSRF token if the user isn't logged out
     const csrfTok = await fetchCsrfToken();
     if (!csrfTok || csrfTok === '') {
-        return { status: VerificationState.loggedOut };
+        return {
+            status: VerificationState.loggedOut,
+            downloadStatus: DownloadStatus.notAttempted,
+            interactions: []
+        };
     }
 
     // Get the interaction data
-    const [activities, downloadErrors] = await downloadAllActivity(csrfTok);
+    const result = await downloadAllActivity(csrfTok);
 
     // Extract interactions from the data
-    const [interactions, extractErrors] = extractData(activities);
+    const [interactions, extractErrors] = extractData(result.activities);
+    result.interactions = interactions;
+    result.errors = result.errors!.concat(extractErrors);
 
-    const errors = downloadErrors.concat(extractErrors);
-
-    return { status: VerificationState.loggedIn, interactions, errors };
+    return result;
 }
 
 export const Google: Device = {

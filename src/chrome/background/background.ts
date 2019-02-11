@@ -1,8 +1,8 @@
-import { updateDevEnvironmentStatus } from '../common/debug';
-import { initErrorHandling, reportError, reportIssue } from '../common/errors';
-import { ValidationResult, VerificationState } from '../../common/types';
 import { Device, unserializeDevice } from '../../common/device';
 import { checkEligibility } from '../../common/eligibility';
+import { ValidationResult, VerificationState } from '../../common/types';
+import { updateDevEnvironmentStatus } from '../common/debug';
+import { initErrorHandling, reportError, reportIssue } from '../common/errors';
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     /** Process validation requests */
@@ -14,6 +14,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             .then((result: ValidationResult) => {
                 checkEligibility(result);
                 sendResponse(result);
+
+                if (result.errors && result.errors.length > 0) {
+                    console.error(
+                        'Errors happened earlier, while processing interactions.'
+                    );
+                    result.errors.forEach(error => {
+                        reportError(error);
+                    });
+                }
             })
             .catch(error => {
                 reportError(error);

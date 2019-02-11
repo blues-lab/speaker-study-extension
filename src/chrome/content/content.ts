@@ -1,24 +1,28 @@
+import { Alexa } from '../../common/alexa/amazon';
+import { Device } from '../../common/device';
+import { Google } from '../../common/google/google';
+import { goodInteraction, orderInteractions } from '../../common/interactions';
 import {
+    DownloadStatus,
     Interaction,
     ValidationResult,
     VerificationState
 } from '../../common/types';
-import { Device } from '../../common/device';
-import { Google } from '../../common/google/google';
-import { Alexa } from '../../common/alexa/amazon';
 import { getDebugStatus } from '../common/debug';
+import { initErrorHandling, reportError } from '../common/errors';
 import {
-    displayVerificationResults,
     displayInteraction,
-    displayVerificationPlaceholder
+    displayVerificationPlaceholder,
+    displayVerificationResults
 } from './views';
-import { selectUnseen } from '../../common/util';
-import { reportError, initErrorHandling } from '../common/errors';
 
 class SurveyState {
     public device: Device;
     public interactions: Interaction[] = [];
-    public seen: number[] = [];
+    /** The next interaction to (try) displaying */
+    public nextInteractionIndex: number = 0;
+    /** The previously displayed interactions. */
+    public seenInteractions: Interaction[] = [];
 }
 
 // tslint:disable-next-line:variable-name
@@ -50,25 +54,15 @@ async function selectValid(state: SurveyState): Promise<Interaction> {
     let foundValid = false;
     let interaction;
     while (!foundValid) {
-        const index = selectUnseen(state.interactions.length, state.seen);
-        state.seen.push(index);
-        interaction = state.interactions[index];
-        if (!interaction.recordingAvailable) {
-            break;
+        if (state.nextInteractionIndex >= state.interactions.length) {
+            throw new Error(
+                'all available interactions have been seen already'
+            );
         }
 
-        try {
-            const response = await fetch(interaction.url);
-            const contentType = response.headers.get('content-type');
-
-            /* checks to make sure the response has the standard audio content-type header */
-            foundValid = contentType !== null;
-        } catch (error) {
-            // Something weird happened when trying to fetch the recording URL.
-            // Report the error and try to find another recording,
-            // in case there's actually something wrong with this one.
-            reportError(error);
-        }
+        interaction = state.interactions[state.nextInteractionIndex];
+        state.nextInteractionIndex++;
+        foundValid = await goodInteraction(interaction);
     }
 
     return interaction;
@@ -87,10 +81,9 @@ async function processRecordingRequest(
 ): Promise<void> {
     // Select recording to show
     let interaction: Interaction;
-    if (questionNumber <= state.seen.length) {
+    if (questionNumber <= state.seenInteractions.length) {
         // Page is requesting a question/interaction that's already been seen.
-        const index = state.seen[questionNumber - 1];
-        interaction = state.interactions[index];
+        interaction = state.seenInteractions[questionNumber - 1];
     } else {
         // Choose a new interaction
         try {
@@ -107,6 +100,9 @@ async function processRecordingRequest(
                 interaction = ERROR_INTERACTION;
             }
         }
+
+        // Remember that we've seen this interaction
+        state.seenInteractions.push(interaction);
     }
 
     // Display recording on page
@@ -143,33 +139,29 @@ async function processVerify(state: SurveyState) {
         result = await validate(state.device);
     } catch (error) {
         reportError(error);
-        result = { status: VerificationState.error };
+        result = {
+            status: VerificationState.error,
+            downloadStatus: DownloadStatus.error,
+            interactions: []
+        };
     }
 
-    if (result.interactions) {
-        state.interactions = result.interactions;
-    }
+    state.interactions = result.interactions;
+    orderInteractions(state.interactions);
 
     if (result.errors && result.errors.length > 0) {
         console.error(
             'Errors happened earlier, while processing interactions.'
         );
-        result.errors.forEach(error => {
-            reportError(error);
-        });
     }
 
     // If debug is on, always report status as logged in
     const debug = await getDebugStatus();
-    const verificationStatus = debug
-        ? VerificationState.loggedIn
-        : result.status;
+    if (debug) {
+        result.status = VerificationState.loggedIn;
+    }
 
-    displayVerificationResults(
-        verificationStatus,
-        state.device,
-        state.interactions
-    );
+    displayVerificationResults(result, state.device);
 }
 
 /**

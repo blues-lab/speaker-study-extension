@@ -1,6 +1,6 @@
 {
     "name": "Berkeley Smart Speaker Study",
-    "version": "2019.1.28",
+    "version": "2019.2.11",
     "description": "An extension that allows you to participate in the Berkeley Smart Speaker Study",
     "manifest_version": 2,
     "background": {
@@ -12,16 +12,11 @@
     },
     "content_scripts": [
         {
-            "matches": [
-                "https://berkeley.qualtrics.com/jfe/form/SV_7NzNJ4QmCe4uE05?*"
-            ],
+            "matches": ["https://berkeley.qualtrics.com/jfe/form/*"],
             "all_frames": true,
             "js": ["content.js"]
         }
     ],
-    "externally_connectable": {
-        "matches": ["https://berkeley.qualtrics.com/*"]
-    },
     "icons": {
         "16": "assets/logo.png",
         "32": "assets/logo.png",

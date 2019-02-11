@@ -36,7 +36,7 @@ export function zip<T, U, V>(arr1: T[], arr2: U[], f: (T, U) => V): V[] {
 /** Wait for the specified time
  * @param time number of milliseconds to wait
  */
-export function wait(time: number): Promise<void> {
+export function sleep(time: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, time));
 }
 
@@ -58,3 +58,22 @@ export function summarize(interactions: Interaction[]): object {
     });
     return report;
 }
+
+/**
+ * Randomly shuffle the given array in place using the Fisher–Yates shuffle
+ * code from https://stackoverflow.com/a/12646864
+ */
+export function shuffleArray(array: any[]): void {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+}
+
+/**
+ * Return true if given array is sorted in ascending order
+ * via https://stackoverflow.com/a/53833620
+ */
+
+export const isSortedAscending = (arr: any[]): boolean =>
+    arr.every((v, i, a) => !i || a[i - 1] <= v);
