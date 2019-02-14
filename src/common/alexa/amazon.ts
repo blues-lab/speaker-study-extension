@@ -181,6 +181,15 @@ async function fetchTranscriptPage(
             })
         }
     );
+
+    if (!response.ok) {
+        throw new Error(
+            `request for transcripts failed with status ${response.status}: ${
+                response.statusText
+            }`
+        );
+    }
+
     const text = await response.text();
     return text;
 }
@@ -218,6 +227,14 @@ async function fetchTimestamps(
         }
     );
 
+    if (!response.ok) {
+        throw new Error(
+            `request for timestamps failed with status ${response.status}: ${
+                response.statusText
+            }`
+        );
+    }
+
     const json = await response.json();
 
     // Validate response
@@ -244,8 +261,21 @@ function updateInteractionTimestamps(
     interactions: AlexaInteraction[],
     timestamps: AmazonTimestamp[]
 ): void {
+    if (!Array.isArray(timestamps)) {
+        throw new Error('timestamps are not an array');
+    } else if (interactions.length > timestamps.length) {
+        throw new Error('number of interactions exceeds number of timestamps');
+    }
+
     interactions.forEach((interaction, i) => {
-        interaction.timestamp = timestamps[i].activityTimeStamp;
+        const timestamp = timestamps[i];
+        if (!timestamp || !timestamp.activityTimeStamp) {
+            throw new Error(
+                `timestamp missing "activityTimeStamp" in ${timestamp}`
+            );
+        }
+
+        interaction.timestamp = timestamp.activityTimeStamp;
     });
 }
 
@@ -303,13 +333,18 @@ export async function downloadAllInteractions(
     // rather than querying the HTML data, we'll query a separate endpoint that only returns timestamps.
     // Fun fact: this is exactly how the Amazon/Alexa UI actually does it.
     // As a bonus, we also retrieve the more fine-grained timestamps for the interactions.
-    let timestamps = await fetchTimestamps(
-        csrfToken,
-        endTimestamp,
-        undefined,
-        BATCH_SIZE + 1
-    );
-    updateInteractionTimestamps(currentInteractions, timestamps);
+    let timestamps: AmazonTimestamp[] = [];
+    try {
+        timestamps = await fetchTimestamps(
+            csrfToken,
+            endTimestamp,
+            undefined,
+            BATCH_SIZE + 1
+        );
+        updateInteractionTimestamps(currentInteractions, timestamps);
+    } catch (error) {
+        allErrors.push(error);
+    }
 
     let batchesRequested = 1; // how many (groups of) requests we've made
 
